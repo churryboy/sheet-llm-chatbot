@@ -1,6 +1,7 @@
 import os
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
+from json_unicode import jsonify_unicode
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from anthropic import Anthropic
@@ -14,8 +15,16 @@ import io
 load_dotenv()
 
 app = Flask(__name__)
-app.config['JSON_AS_ASCII'] = False  # Korean text support
-app.config['JSONIFY_ENSURE_ASCII'] = False  # Ensure jsonify doesn't escape Unicode
+
+# Force UTF-8 and disable ASCII-only JSON
+app.config['JSON_AS_ASCII'] = False
+app.config['JSONIFY_ENSURE_ASCII'] = False
+app.config['JSONIFY_MIMETYPE'] = 'application/json; charset=utf-8'
+
+# Also check environment variable
+if os.environ.get('PYTHONIOENCODING') != 'utf-8':
+    os.environ['PYTHONIOENCODING'] = 'utf-8'
+
 CORS(app)  # CORS 설정으로 프론트엔드와 통신 가능
 
 # Claude (Anthropic) 클라이언트 초기화
@@ -216,7 +225,8 @@ def chat():
         
         answer = response.content[0].text
         
-        return jsonify({
+        # Use custom Unicode-safe JSON response
+        return jsonify_unicode({
             'answer': answer,
             'data_count': len(sheet_data)
         })
@@ -228,7 +238,7 @@ def chat():
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """헬스 체크 엔드포인트"""
-    return jsonify({'status': 'ok'})
+    return jsonify_unicode({'status': 'ok'})
 
 @app.route('/api/debug/sheet-data', methods=['GET'])
 def debug_sheet_data():
