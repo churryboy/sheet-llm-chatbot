@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -15,6 +15,7 @@ load_dotenv()
 
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False  # Korean text support
+app.config['JSONIFY_ENSURE_ASCII'] = False  # Ensure jsonify doesn't escape Unicode
 CORS(app)  # CORS 설정으로 프론트엔드와 통신 가능
 
 # Claude (Anthropic) 클라이언트 초기화
@@ -234,14 +235,18 @@ def debug_sheet_data():
     """디버그용: 현재 시트 데이터 확인"""
     try:
         sheet_data = get_google_sheets_data()
-        return jsonify({
+        response_data = {
             'spreadsheet_id': SPREADSHEET_ID,
             'range': RANGE_NAME,
             'data_count': len(sheet_data),
             'headers': list(sheet_data[0].keys()) if sheet_data else [],
             'first_row': sheet_data[0] if sheet_data else None,
             'all_names': [row.get('이름을 적어주세요', row.get('이름', row.get('Name', ''))) for row in sheet_data] if sheet_data else []
-        })
+        }
+        # Create response with explicit UTF-8 encoding
+        response = make_response(json.dumps(response_data, ensure_ascii=False))
+        response.headers['Content-Type'] = 'application/json; charset=utf-8'
+        return response
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
