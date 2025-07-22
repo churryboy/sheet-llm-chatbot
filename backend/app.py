@@ -25,7 +25,16 @@ app.config['JSONIFY_MIMETYPE'] = 'application/json; charset=utf-8'
 if os.environ.get('PYTHONIOENCODING') != 'utf-8':
     os.environ['PYTHONIOENCODING'] = 'utf-8'
 
-CORS(app)  # CORS 설정으로 프론트엔드와 통신 가능
+# CORS 설정 - 더 명시적으로 설정
+CORS(app, origins=[
+    'http://localhost:3000', 
+    'http://127.0.0.1:3000', 
+    'https://user-gpt-chatbot.vercel.app',
+    'https://*.vercel.app',
+    'file://*'
+], 
+     allow_headers=['Content-Type', 'Accept'],
+     methods=['GET', 'POST', 'OPTIONS'])
 
 # Claude (Anthropic) 클라이언트 초기화
 try:
@@ -235,6 +244,89 @@ def chat():
         print(f"Error in chat endpoint: {str(e)}")
         return jsonify({'error': f'처리 중 오류가 발생했습니다: {str(e)}'}), 500
 
+@app.route('/api/demographics', methods=['GET'])
+def demographics():
+    """Get demographic statistics from Google Sheets data"""
+    try:
+        sheet_data = get_google_sheets_data()
+        
+        if not sheet_data:
+            return jsonify_unicode({'error': '데이터가 없습니다.'}), 400
+        
+        # Initialize counters
+        gender_count = {}
+        school_year_count = {}
+        geography_count = {}
+        gpt_usage_count = 0
+        gemini_usage_count = 0
+        total_students = len(sheet_data)
+        
+        # Count demographics
+        for row in sheet_data:
+            # Gender
+            gender = row.get('성별이 어떻게 되나요?', '').strip()
+            if gender:
+                gender_count[gender] = gender_count.get(gender, 0) + 1
+            
+            # School year - group into categories
+            school_year = row.get('현재 학년이 어떻게 되나요?', '').strip()
+            if school_year:
+                # Group elementary school
+                if school_year in ['초1', '초2', '초3', '초4', '초5', '초6']:
+                    school_year_count['초등학생'] = school_year_count.get('초등학생', 0) + 1
+                # Group middle school
+                elif school_year in ['중1', '중2', '중3']:
+                    school_year_count['중학생'] = school_year_count.get('중학생', 0) + 1
+                # Group high school
+                elif school_year in ['고1', '고2', '고3']:
+                    school_year_count['고등학생'] = school_year_count.get('고등학생', 0) + 1
+                # Keep others as is
+                else:
+                    school_year_count[school_year] = school_year_count.get(school_year, 0) + 1
+            
+            # Geography
+            geography = row.get('현재 거주중인 지역이 어디인가요? ', '').strip()
+            if geography:
+                geography_count[geography] = geography_count.get(geography, 0) + 1
+            
+            # GPT/Gemini usage (checking multiple relevant columns)
+            # Check general usage
+            general_usage = row.get('GPT, Gemini와 같은 LLM 인공지능 서비스를 *평소에 활용*하고 계신가요?', '').strip()
+            # Check math usage
+            math_usage = row.get('GPT, Gemini와 같은 LLM 인공지능 서비스를 *수학 문제를 풀때*에도 사용하고 계신가요?', '').strip()
+            
+            # Count as user only if they answered exactly these responses
+            target_responses = ['네 활발하게 사용하고 있습니다', '네 가끔 사용합니다']
+            if general_usage in target_responses or math_usage in target_responses:
+                gpt_usage_count += 1
+        
+        # Calculate percentages for individual data points
+        gender_percentages = {}
+        for gender, count in gender_count.items():
+            gender_percentages[gender] = round((count / total_students) * 100, 1)
+        
+        school_year_percentages = {}
+        for year, count in school_year_count.items():
+            school_year_percentages[year] = round((count / total_students) * 100, 1)
+        
+        geography_percentages = {}
+        for region, count in geography_count.items():
+            geography_percentages[region] = round((count / total_students) * 100, 1)
+        
+        gpt_usage_percentage = round((gpt_usage_count / total_students) * 100, 1)
+        
+        return jsonify_unicode({
+            'gender': gender_percentages,
+            'school_year': school_year_percentages,
+            'geography': geography_percentages,
+            'llm_usage_percentage': gpt_usage_percentage,
+            'total_count': total_students
+        })
+    
+    except Exception as e:
+        print(f"Error in demographics endpoint: {str(e)}")
+        return jsonify({'error': f'처리 중 오류가 발생했습니다: {str(e)}'}), 500
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """헬스 체크 엔드포인트"""
@@ -261,4 +353,4 @@ def debug_sheet_data():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=False)
+    app.run(host='0.0.0.0', port=8000, debug=False)

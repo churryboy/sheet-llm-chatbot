@@ -3,11 +3,11 @@ services:
     name: sheet-llm-chatbot-backend
     runtime: python
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn app:app"
+    startCommand: "gunicorn app:app --bind 0.0.0.0:$PORT"
     envVars:
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: GOOGLE_API_KEY
         sync: false
-      - key: PORT
-        value: 10000
+      - key: PYTHONIOENCODING
+        value: utf-8
