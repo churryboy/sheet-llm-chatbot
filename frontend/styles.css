@@ -201,6 +201,34 @@ main {
     100% { transform: rotate(360deg); }
 }
 
+/* Add Data Button */
+.add-data-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: linear-gradient(135deg, #ff5500 0%, #cc4400 100%);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 25px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(255, 85, 0, 0.3);
+    transition: all 0.3s;
+    z-index: 1000;
+}
+
+.add-data-btn:hover {
+    background: linear-gradient(135deg, #cc4400 0%, #ff5500 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 85, 0, 0.4);
+}
+
+.add-data-btn:active {
+    transform: translateY(0);
+}
+
 /* 모바일 반응형 */
 @media (max-width: 768px) {
     header h1 {
@@ -213,5 +241,12 @@ main {
     
     .chat-container {
         height: 500px;
+    }
+    
+    .add-data-btn {
+        top: 10px;
+        right: 10px;
+        padding: 10px 20px;
+        font-size: 14px;
     }
 }

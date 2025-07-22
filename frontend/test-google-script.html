@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Script Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #ff5500;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #cc4400;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .step {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Google Apps Script 연동 테스트</h1>
+        
+        <div class="step">
+            <h2>1단계: Google Apps Script 설정</h2>
+            <p>아직 Google Apps Script를 설정하지 않았다면:</p>
+            <ol>
+                <li><a href="https://docs.google.com/spreadsheets/d/17jJx_ncFoa00ih6VRRO-cI5rqG_zZZu8PsDvEHZSDMQ/edit" target="_blank">Google Sheet 열기</a></li>
+                <li>확장 프로그램 > Apps Script 클릭</li>
+                <li><code>google-apps-script.js</code> 파일의 내용을 복사하여 붙여넣기</li>
+                <li>저장 후 배포 > 새 배포</li>
+                <li>웹 앱으로 배포 (모든 사용자 액세스 허용)</li>
+            </ol>
+        </div>
+
+        <div class="step">
+            <h2>2단계: Web App URL 입력</h2>
+            <label for="scriptUrl">Google Apps Script Web App URL:</label>
+            <input type="text" id="scriptUrl" placeholder="https://script.google.com/macros/s/.../exec" />
+            <br>
+            <button onclick="testConnection()">연결 테스트</button>
+            <button onclick="sendTestData()">테스트 데이터 전송</button>
+        </div>
+
+        <div id="result" class="result"></div>
+
+        <div class="step">
+            <h2>3단계: 성공하면 URL 업데이트</h2>
+            <p>테스트가 성공하면 <code>form-script.js</code> 파일의 2번째 줄을 업데이트하세요:</p>
+            <pre id="updateCode"></pre>
+        </div>
+    </div>
+
+    <script>
+        function showResult(message, isSuccess) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message;
+            resultDiv.className = 'result ' + (isSuccess ? 'success' : 'error');
+            resultDiv.style.display = 'block';
+        }
+
+        async function testConnection() {
+            const url = document.getElementById('scriptUrl').value;
+            if (!url) {
+                showResult('URL을 입력해주세요.', false);
+                return;
+            }
+
+            try {
+                showResult('연결 테스트 중...', true);
+                
+                // GET 요청으로 테스트
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.status === 'active') {
+                    showResult('✅ 연결 성공! Google Apps Script가 정상적으로 작동합니다.', true);
+                    updateCodeExample(url);
+                } else {
+                    showResult('연결은 되었지만 예상한 응답이 아닙니다. 응답: ' + JSON.stringify(data), false);
+                }
+            } catch (error) {
+                showResult('❌ 연결 실패: ' + error.message + '\nCORS 에러일 수 있습니다. 테스트 데이터 전송을 시도해보세요.', false);
+            }
+        }
+
+        async function sendTestData() {
+            const url = document.getElementById('scriptUrl').value;
+            if (!url) {
+                showResult('URL을 입력해주세요.', false);
+                return;
+            }
+
+            const testData = {
+                name: '테스트 학생',
+                birthYear: '2005',
+                grade: '고2',
+                schoolName: '테스트 고등학교',
+                city: '서울시 강남구',
+                schoolScore: '90점',
+                mockExamScore: '2등급',
+                studyStyle: '테스트 공부 스타일',
+                preferredMethod: '테스트 선호 방법',
+                challengingPart: '테스트 어려운 부분',
+                featureRequest: '테스트 기능 요청',
+                timestamp: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+            };
+
+            try {
+                showResult('테스트 데이터 전송 중...', true);
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(testData)
+                });
+
+                // no-cors 모드에서는 응답을 읽을 수 없으므로 성공으로 간주
+                showResult('✅ 데이터 전송 완료! Google Sheet를 확인해보세요.', true);
+                updateCodeExample(url);
+                
+            } catch (error) {
+                showResult('❌ 전송 실패: ' + error.message, false);
+            }
+        }
+
+        function updateCodeExample(url) {
+            const codeDiv = document.getElementById('updateCode');
+            codeDiv.textContent = `const GOOGLE_SCRIPT_URL = '${url}';`;
+            codeDiv.style.background = '#e9ecef';
+            codeDiv.style.padding = '10px';
+            codeDiv.style.borderRadius = '5px';
+            codeDiv.style.overflow = 'auto';
+        }
+    </script>
+</body>
+</html>

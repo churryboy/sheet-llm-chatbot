@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학생 정보 입력</title>
+    <link rel="stylesheet" href="form-styles.css">
+</head>
+<body>
+    <div class="form-container">
+        <header>
+            <h1>학생 정보 입력</h1>
+            <p class="subtitle">아래 정보를 입력해주세요</p>
+        </header>
+
+        <form id="studentForm">
+            <div class="form-group">
+                <label for="name">이름 <span class="required">*</span></label>
+                <input type="text" id="name" name="name" required>
+            </div>
+
+            <div class="form-group">
+                <label for="birthYear">출생년도 <span class="required">*</span></label>
+                <input type="number" id="birthYear" name="birthYear" min="1990" max="2020" required>
+            </div>
+
+            <div class="form-group">
+                <label for="grade">학년 <span class="required">*</span></label>
+                <select id="grade" name="grade" required>
+                    <option value="">선택하세요</option>
+                    <option value="중1">중학교 1학년</option>
+                    <option value="중2">중학교 2학년</option>
+                    <option value="중3">중학교 3학년</option>
+                    <option value="고1">고등학교 1학년</option>
+                    <option value="고2">고등학교 2학년</option>
+                    <option value="고3">고등학교 3학년</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="schoolName">다니고 있는 학교 이름 <span class="required">*</span></label>
+                <input type="text" id="schoolName" name="schoolName" required>
+            </div>
+
+            <div class="form-group">
+                <label for="city">거주 도시 (도/시/동) <span class="required">*</span></label>
+                <input type="text" id="city" name="city" placeholder="예: 서울시 강남구 삼성동" required>
+            </div>
+
+            <div class="form-group">
+                <label for="schoolScore">내신 점수</label>
+                <input type="text" id="schoolScore" name="schoolScore" placeholder="예: 3.5/4.5 또는 85점">
+            </div>
+
+            <div class="form-group">
+                <label for="mockExamScore">모의고사 점수</label>
+                <input type="text" id="mockExamScore" name="mockExamScore" placeholder="예: 2등급 또는 85점">
+            </div>
+
+            <div class="form-group">
+                <label for="studyStyle">평소 공부 스타일</label>
+                <textarea id="studyStyle" name="studyStyle" rows="4" placeholder="어떻게 공부하시나요?"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="preferredMethod">내가 선호하는 공부법</label>
+                <textarea id="preferredMethod" name="preferredMethod" rows="4" placeholder="어떤 방식의 공부를 선호하시나요?"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="challengingPart">공부하면서 가장 힘든 부분</label>
+                <textarea id="challengingPart" name="challengingPart" rows="4" placeholder="공부할 때 어떤 점이 가장 어려우신가요?"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="featureRequest">콴다가 만들어주었으면 하는 기능</label>
+                <textarea id="featureRequest" name="featureRequest" rows="4" placeholder="어떤 기능이 있으면 좋을까요?"></textarea>
+            </div>
+
+            <div class="button-group">
+                <button type="button" class="cancel-btn" onclick="window.location.href='index.html'">취소</button>
+                <button type="submit" class="submit-btn">제출</button>
+            </div>
+        </form>
+
+        <div id="loading" class="loading-overlay" style="display: none;">
+            <div class="loading-spinner"></div>
+            <p>제출 중...</p>
+        </div>
+
+        <div id="successMessage" class="success-message" style="display: none;">
+            <h2>✅ 제출 완료!</h2>
+            <p>정보가 성공적으로 저장되었습니다.</p>
+            <button onclick="window.location.href='index.html'">메인으로 돌아가기</button>
+        </div>
+    </div>
+
+    <script src="form-script.js"></script>
+</body>
+</html>

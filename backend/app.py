@@ -29,8 +29,8 @@ except Exception as e:
     client = None
 
 # Google Sheets API 설정
-SPREADSHEET_ID = '17jJx_ncFoa00ih6VRRO-cI5rqG_zZZu8PsDvEHZSDMQ'
-RANGE_NAME = 'A:Z'  # 모든 열 읽기 (A부터 Z까지)
+SPREADSHEET_ID = '1-wkdWGG1aE9yfYNN0GFoIQXRxKTSf0x8ZcltGCgYltI'
+RANGE_NAME = 'Sheet1!A:Z'  # Sheet1의 모든 열 읽기
 
 def get_google_sheets_data():
     """구글 시트에서 데이터를 가져오는 함수"""
@@ -40,7 +40,8 @@ def get_google_sheets_data():
         timestamp = int(time.time())
         
         # 먼저 CSV 내보내기 URL로 시도 (공개 시트인 경우 가장 간단)
-        csv_url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv&gid=0&timestamp={timestamp}"
+        # Using gid=516851124 for the specific sheet tab
+        csv_url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv&gid=516851124&timestamp={timestamp}"
         
         # 캐시 방지 헤더 추가
         headers = {
@@ -223,6 +224,22 @@ def chat():
 def health_check():
     """헬스 체크 엔드포인트"""
     return jsonify({'status': 'ok'})
+
+@app.route('/api/debug/sheet-data', methods=['GET'])
+def debug_sheet_data():
+    """디버그용: 현재 시트 데이터 확인"""
+    try:
+        sheet_data = get_google_sheets_data()
+        return jsonify({
+            'spreadsheet_id': SPREADSHEET_ID,
+            'range': RANGE_NAME,
+            'data_count': len(sheet_data),
+            'headers': list(sheet_data[0].keys()) if sheet_data else [],
+            'first_row': sheet_data[0] if sheet_data else None,
+            'all_names': [row.get('이름을 적어주세요', row.get('이름', row.get('Name', ''))) for row in sheet_data] if sheet_data else []
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=False)
