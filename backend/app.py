@@ -17,9 +17,16 @@ app = Flask(__name__)
 CORS(app)  # CORS 설정으로 프론트엔드와 통신 가능
 
 # Claude (Anthropic) 클라이언트 초기화
-client = Anthropic(
-    api_key=os.getenv('ANTHROPIC_API_KEY')
-)
+try:
+    anthropic_api_key = os.getenv('ANTHROPIC_API_KEY')
+    if anthropic_api_key:
+        client = Anthropic(api_key=anthropic_api_key)
+    else:
+        client = None
+        print("Warning: ANTHROPIC_API_KEY not found")
+except Exception as e:
+    print(f"Error initializing Anthropic client: {str(e)}")
+    client = None
 
 # Google Sheets API 설정
 SPREADSHEET_ID = '17jJx_ncFoa00ih6VRRO-cI5rqG_zZZu8PsDvEHZSDMQ'
@@ -188,6 +195,9 @@ def chat():
             print(f"First row: {sheet_data[0]}")
         
         # Claude API 호출
+        if not client:
+            return jsonify({'error': 'Claude API가 설정되지 않았습니다. ANTHROPIC_API_KEY를 확인해주세요.'}), 500
+        
         response = client.messages.create(
             model="claude-3-5-sonnet-20241022",
             system="당신은 데이터 분석을 도와주는 친절한 어시스턴트입니다. 주어진 데이터를 기반으로 정확하게 답변해주세요.",
