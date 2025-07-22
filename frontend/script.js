@@ -1,7 +1,7 @@
 // API 엔드포인트 설정 (배포 시 변경 필요)
 const API_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:5001/api/chat' 
-    : 'https://YOUR-BACKEND-URL.onrender.com/api/chat'; // Replace with your Render URL
+    : 'https://sheet-llm-chatbot-backend.onrender.com/api/chat'; // Render backend URL
 
 // 메시지 전송 함수
 async function sendMessage() {
