@@ -51,8 +51,8 @@ def get_google_sheets_data():
         timestamp = int(time.time())
         
         # 먼저 CSV 내보내기 URL로 시도 (공개 시트인 경우 가장 간단)
-        # Using gid=516851124 for the specific sheet tab
-        csv_url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv&gid=516851124&timestamp={timestamp}"
+        # Using gid=187909252 for the specific sheet tab
+        csv_url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv&gid=187909252&timestamp={timestamp}"
         
         # 캐시 방지 헤더 추가
         headers = {

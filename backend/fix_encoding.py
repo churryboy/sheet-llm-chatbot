@@ -105,7 +105,7 @@ def fix_csv_encoding(csv_url):
 def main():
     # Your Google Sheets CSV export URL
     SPREADSHEET_ID = '1-wkdWGG1aE9yfYNN0GFoIQXRxKTSf0x8ZcltGCgYltI'
-    csv_url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv&gid=516851124"
+    csv_url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv&gid=187909252"
     
     print("Checking Google Sheets data for encoding issues...\n")
     issues = fix_csv_encoding(csv_url)
