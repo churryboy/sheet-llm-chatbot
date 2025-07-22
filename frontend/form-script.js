@@ -22,7 +22,8 @@ async function handleSubmit(e) {
         studyStyle: formData.get('studyStyle') || '',
         preferredMethod: formData.get('preferredMethod') || '',
         challengingPart: formData.get('challengingPart') || '',
-        featureRequest: formData.get('featureRequest') || ''
+        featureRequest: formData.get('featureRequest') || '',
+        timestamp: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
     };
     
     try {

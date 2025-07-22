@@ -14,6 +14,7 @@ import io
 load_dotenv()
 
 app = Flask(__name__)
+app.config['JSON_AS_ASCII'] = False  # Korean text support
 CORS(app)  # CORS 설정으로 프론트엔드와 통신 가능
 
 # Claude (Anthropic) 클라이언트 초기화
@@ -52,6 +53,9 @@ def get_google_sheets_data():
         response = requests.get(csv_url, headers=headers)
         
         if response.status_code == 200:
+            # Ensure proper UTF-8 encoding
+            response.encoding = 'utf-8'
+            
             # CSV 데이터 파싱
             csv_data = csv.reader(io.StringIO(response.text))
             rows = list(csv_data)
