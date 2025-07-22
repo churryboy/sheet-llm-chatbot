@@ -1,7 +1,7 @@
 // API 엔드포인트 설정 (배포 시 변경 필요)
 const API_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:5001/api/chat' 
-    : 'http://localhost:5001/api/chat'; // 임시로 로컬 백엔드 사용 (백엔드 배포 후 변경 필요)
+    : 'https://YOUR-BACKEND-URL.onrender.com/api/chat'; // Replace with your Render URL
 
 // 메시지 전송 함수
 async function sendMessage() {
