@@ -38,6 +38,8 @@ CORS(app, origins=[
     'http://127.0.0.1:3000', 
     'https://user-gpt-chatbot.vercel.app',
     'https://*.vercel.app',
+    'https://qanda-user-gpt.com',
+    'https://www.qanda-user-gpt.com',
     'file://*'
 ], 
      allow_headers=['Content-Type', 'Accept'],
