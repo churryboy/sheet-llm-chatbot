@@ -794,6 +794,7 @@ def chat():
         enable_web_search = data.get('enable_web_search', False)  # 웹 검색 활성화 옵션
         sheet_gid = data.get('sheet_gid', None)  # 특정 시트 GID
         sheet_name = data.get('sheet_name', None)  # 특정 시트 이름
+        conversation_history = data.get('conversation_history', [])  # 대화 히스토리
         
         if not user_question:
             return jsonify({'error': '질문을 입력해주세요.'}), 400
@@ -1004,12 +1005,29 @@ def chat():
         if search_results:
             system_prompt += "\n\n웹 검색 결과가 포함된 경우, 출처를 명확히 밝히고 시트 데이터와 통합하여 분석해주세요."
         
+        # Build messages array with conversation history
+        messages = []
+        
+        # Add conversation history if provided
+        if conversation_history:
+            for msg in conversation_history:
+                if msg.get('role') and msg.get('content'):
+                    messages.append({
+                        "role": msg['role'],
+                        "content": msg['content']
+                    })
+        
+        # Add current user question with data context
+        messages.append({"role": "user", "content": prompt})
+        
+        # Log conversation context for debugging
+        print(f"Conversation history length: {len(conversation_history)}")
+        print(f"Total messages to Claude: {len(messages)}")
+        
         response = client.messages.create(
             model="claude-3-5-sonnet-20241022",
             system=system_prompt,
-            messages=[
-                {"role": "user", "content": prompt}
-            ],
+            messages=messages,
             temperature=0.7,
             max_tokens=1500  # 웹 검색 결과 포함 시 더 긴 답변 허용
         )

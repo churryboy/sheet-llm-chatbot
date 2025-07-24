@@ -21,6 +21,9 @@ let currentSheet = {
 // 채팅 기록 저장용 객체 (시트별로 대화 기록 보관)
 let chatHistories = {};
 
+// 대화 컨텍스트 저장용 객체 (시트별로 메시지 히스토리 보관)
+let conversationContexts = {};
+
 // 현재 시트의 표시 이름을 가져오는 헬퍼 함수
 function getSheetDisplayName(button) {
     const tabText = button.querySelector('.tab-text');
@@ -94,6 +97,17 @@ async function sendMessage() {
     // 사용자 메시지 추가
     addMessage(question, 'user');
     
+    // 현재 시트의 대화 컨텍스트 가져오기 (없으면 새로 생성)
+    if (!conversationContexts[currentSheet.gid]) {
+        conversationContexts[currentSheet.gid] = [];
+    }
+    
+    // 사용자 메시지를 대화 컨텍스트에 추가
+    conversationContexts[currentSheet.gid].push({
+        role: 'user',
+        content: question
+    });
+    
     // 봇 로딩 메시지 추가
     const botMessageElement = addMessage('', 'bot', true);
     
@@ -102,11 +116,13 @@ async function sendMessage() {
     
     try {
         console.log('Sending request to:', API_URL);
+        console.log('Conversation history length:', conversationContexts[currentSheet.gid].length);
         console.log('Request payload:', { 
             question: question,
             sheet_gid: currentSheet.gid,
             sheet_name: currentSheet.name,
-            spreadsheet_id: currentSheet.spreadsheet_id
+            spreadsheet_id: currentSheet.spreadsheet_id,
+            conversation_history: conversationContexts[currentSheet.gid].slice(-10) // 최근 10개 메시지만 전송
         });
         
         const response = await fetch(API_URL, {
@@ -118,7 +134,8 @@ async function sendMessage() {
                 question: question,
                 sheet_gid: currentSheet.gid,
                 sheet_name: currentSheet.name,
-                spreadsheet_id: currentSheet.spreadsheet_id
+                spreadsheet_id: currentSheet.spreadsheet_id,
+                conversation_history: conversationContexts[currentSheet.gid].slice(-10) // 최근 10개 메시지만 전송
             })
         });
         
@@ -131,6 +148,12 @@ async function sendMessage() {
         if (response.ok && data.answer) {
             // 로딩 제거하고 답변 표시
             botMessageElement.innerHTML = `<div class="message-content">${formatAnswer(data.answer)}</div>`;
+            
+            // 봇 답변을 대화 컨텍스트에 추가
+            conversationContexts[currentSheet.gid].push({
+                role: 'assistant',
+                content: data.answer
+            });
         } else {
             console.error('Error in response:', data);
             botMessageElement.innerHTML = `<div class="message-content">오류: ${data.error || '알 수 없는 오류가 발생했습니다.'}</div>`;
