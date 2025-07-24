@@ -265,8 +265,19 @@ def determine_sheet_context(user_question):
     # Keywords that indicate tablet behavior sheet
     tablet_keywords = ['태블릿', 'tablet', 'ipad', '아이패드', '갤탭', 'tab', '패드']
     
-    # Check if question is about tablets
+    # Keywords that indicate parent survey sheet
+    parent_keywords = ['자녀', '학부모', '부모', '어머니', '아버지', '초등 자녀', '중등 자녀', '고등 자녀']
+    
+    # Check if question is about parents/children
     question_lower = user_question.lower()
+    for keyword in parent_keywords:
+        if keyword in user_question:  # Use original case for Korean
+            return [{
+                'gid': '933791472',
+                'name': 'Parent Survey'
+            }]
+    
+    # Check if question is about tablets
     for keyword in tablet_keywords:
         if keyword in question_lower:
             return [{
@@ -530,6 +541,17 @@ def create_prompt(user_question, sheet_data, search_results=None):
                     grade_stats['중학생'] = grade_stats.get('중학생', 0) + 1
                 elif '고등' in school_level:
                     grade_stats['고등학생'] = grade_stats.get('고등학생', 0) + 1
+            
+            # Check for child grade column (for parent surveys) - Updated column name
+            child_grade = row.get('현재 자녀의 학년', '').strip()
+            if child_grade:
+                # Use exact values from spreadsheet
+                if child_grade == '초등 자녀':
+                    grade_stats['초등 자녀'] = grade_stats.get('초등 자녀', 0) + 1
+                elif child_grade == '중등 자녀':
+                    grade_stats['중등 자녀'] = grade_stats.get('중등 자녀', 0) + 1
+                elif child_grade == '고등 자녀':
+                    grade_stats['고등 자녀'] = grade_stats.get('고등 자녀', 0) + 1
             
             # 지역 통계 - Handle different column names
             region = row.get('현재 거주중인 지역이 어디인가요? ', '') or row.get('거주지역', '') or row.get('지역', '')
@@ -845,12 +867,12 @@ def chat():
             
             return jsonify({'error': error_msg}), 403
         
-        # 웹 검색 수행 (필요한 경우)
+        # 웹 검색 수행 (항상 수행, enable_web_search 플래그 무시)
         search_results = None
-        if enable_web_search:
-            # 검색 쿼리 추출
-            search_queries = extract_search_queries(user_question, sheet_data)
-            
+        # 검색 쿼리 추출
+        search_queries = extract_search_queries(user_question, sheet_data)
+        
+        if search_queries:  # 검색 쿼리가 있을 때만 검색 수행
             # 각 쿼리에 대해 검색 수행
             all_search_results = []
             for query in search_queries:
@@ -865,7 +887,21 @@ def chat():
                     seen_links.add(result['link'])
                     search_results.append(result)
             
-            search_results = search_results[:5]  # 최대 5개 결과만 사용
+            # 관련성 높은 결과만 필터링
+            if search_results:
+                relevant_results = []
+                for result in search_results[:5]:  # 최대 5개 결과만 검토
+                    # 제목이나 스니펫에 질문의 핵심 키워드가 포함되어 있는지 확인
+                    title_snippet = (result.get('title', '') + ' ' + result.get('snippet', '')).lower()
+                    # 관련성 키워드 체크
+                    relevant = False
+                    question_keywords = user_question.lower().split()
+                    # 최소 2개 이상의 주요 키워드가 포함되어 있으면 관련성 있다고 판단
+                    matching_keywords = sum(1 for keyword in question_keywords if len(keyword) > 2 and keyword in title_snippet)
+                    if matching_keywords >= 2:
+                        relevant_results.append(result)
+                
+                search_results = relevant_results if relevant_results else None
         
         # 대화 컨텍스트에서 필터링 조건 추출
         context_filter = None

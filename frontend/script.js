@@ -147,7 +147,34 @@ async function sendMessage() {
         
         if (response.ok && data.answer) {
             // 로딩 제거하고 답변 표시
-            botMessageElement.innerHTML = `<div class="message-content">${formatAnswer(data.answer)}</div>`;
+            let responseHTML = `<div class="message-content">${formatAnswer(data.answer)}</div>`;
+            
+            // 웹 검색 결과가 있으면 별도로 표시
+            if (data.web_search_count && data.web_search_count > 0 && data.search_sources) {
+                responseHTML += `
+                    <div class="web-search-results">
+                        <h4>🔍 관련 웹 검색 결과</h4>
+                        <div class="search-results-list">
+                `;
+                
+                data.search_sources.forEach((source, index) => {
+                    responseHTML += `
+                        <div class="search-result-item">
+                            <a href="${source.link}" target="_blank" rel="noopener noreferrer">
+                                <strong>${index + 1}. ${source.title}</strong>
+                            </a>
+                            <div class="search-source">출처: ${source.source}</div>
+                        </div>
+                    `;
+                });
+                
+                responseHTML += `
+                        </div>
+                    </div>
+                `;
+            }
+            
+            botMessageElement.innerHTML = responseHTML;
             
             // 봇 답변을 대화 컨텍스트에 추가
             conversationContexts[currentSheet.gid].push({
