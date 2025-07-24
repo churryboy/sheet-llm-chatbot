@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-button { margin: 10px; padding: 10px 20px; cursor: pointer; }
+        .result { margin: 20px 0; padding: 15px; background: #f0f0f0; border-radius: 5px; }
+        .question { font-weight: bold; color: #333; }
+        .answer { margin-top: 10px; white-space: pre-wrap; }
+        .timestamp { color: #666; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <h1>Student Count API Test</h1>
+    
+    <div>
+        <button class="test-button" onclick="testQuestion('중학생은 몇명이야?')">Test: 중학생은 몇명이야?</button>
+        <button class="test-button" onclick="testQuestion('현재 데이터 총 몇명의 응답이 들어가있어?')">Test: 전체 응답자 수</button>
+        <button class="test-button" onclick="testQuestion('중1,중2,중3 숫자의 합은 얼마야')">Test: 중1+중2+중3</button>
+        <button class="test-button" onclick="clearCache()">Clear Cache & Reload</button>
+    </div>
+    
+    <div id="results"></div>
+    
+    <script>
+        async function testQuestion(question) {
+            const timestamp = new Date().toLocaleString('ko-KR');
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    },
+                    body: JSON.stringify({ question: question }),
+                    cache: 'no-store'
+                });
+                
+                const data = await response.json();
+                
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'result';
+                resultDiv.innerHTML = `
+                    <div class="timestamp">${timestamp}</div>
+                    <div class="question">Question: ${question}</div>
+                    <div class="answer">Answer: ${data.answer}</div>
+                    <div class="timestamp">Data count: ${data.data_count}</div>
+                `;
+                
+                document.getElementById('results').insertBefore(resultDiv, document.getElementById('results').firstChild);
+                
+                // Highlight numbers in the answer
+                resultDiv.querySelector('.answer').innerHTML = 
+                    resultDiv.querySelector('.answer').innerHTML.replace(/(\d+)명/g, '<strong style="color: red;">$1명</strong>');
+                
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        function clearCache() {
+            // Clear all caches
+            if ('caches' in window) {
+                caches.keys().then(names => {
+                    names.forEach(name => {
+                        caches.delete(name);
+                    });
+                });
+            }
+            
+            // Force reload
+            window.location.reload(true);
+        }
+    </script>
+</body>
+</html>
