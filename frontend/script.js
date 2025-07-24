@@ -1,9 +1,14 @@
+// Version info for debugging
+console.log('Script version: 2025-01-24-1257-custom-domain');
+console.log('Current domain:', window.location.hostname);
+
 // API 엔드포인트 설정 (배포 시 변경 필요)
 const API_BASE_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:8000' 
     : 'https://sheet-llm-chatbot-backend.onrender.com'; // Render backend URL
 
 const API_URL = `${API_BASE_URL}/api/chat`;
+console.log('API Base URL:', API_BASE_URL);
 
 // 현재 선택된 시트 정보
 let currentSheet = {
