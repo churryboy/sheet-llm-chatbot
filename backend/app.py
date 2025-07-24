@@ -63,17 +63,22 @@ RANGE_NAME = 'Sheet1!A:Z'  # Sheet1의 모든 열 읽기
 DEFAULT_SHEET_GID = '187909252'  # Sheet1's GID
 
 # Custom data sources file
-DATA_SOURCES_FILE = 'data_sources.json'
+DATA_SOURCES_FILE = os.path.join(os.path.dirname(__file__), 'data_sources.json')
 
 # Load custom data sources
 def load_data_sources():
     """Load custom data sources from file"""
+    print(f"[DEBUG] Loading data sources from: {DATA_SOURCES_FILE}")
+    print(f"[DEBUG] File exists: {os.path.exists(DATA_SOURCES_FILE)}")
     if os.path.exists(DATA_SOURCES_FILE):
         try:
             with open(DATA_SOURCES_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                sources = json.load(f)
+                print(f"[DEBUG] Loaded {len(sources)} custom sources")
+                return sources
         except Exception as e:
             print(f"Error loading data sources: {e}")
+    print(f"[DEBUG] No custom sources found")
     return []
 
 # Save custom data sources
@@ -1370,7 +1375,7 @@ def update_data_source():
         # Check if it's a default sheet (from main spreadsheet)
         if spreadsheet_id == SPREADSHEET_ID:
             # For default sheets, we'll store custom titles separately
-            custom_titles_file = 'custom_sheet_titles.json'
+            custom_titles_file = os.path.join(os.path.dirname(__file__), 'custom_sheet_titles.json')
             custom_titles = {}
             
             if os.path.exists(custom_titles_file):
@@ -1444,7 +1449,7 @@ def get_data_sources():
         
         # Load custom titles for default sheets
         custom_titles = {}
-        custom_titles_file = 'custom_sheet_titles.json'
+        custom_titles_file = os.path.join(os.path.dirname(__file__), 'custom_sheet_titles.json')
         if os.path.exists(custom_titles_file):
             try:
                 with open(custom_titles_file, 'r', encoding='utf-8') as f:

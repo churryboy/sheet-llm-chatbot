@@ -430,6 +430,7 @@ function displayDataOverview(data) {
 
 // Function to show edit modal
 function showEditDataModal(source) {
+    console.log('showEditDataModal called with source:', source);
     const modal = document.getElementById('edit-data-modal');
     document.getElementById('edit-data-title').value = source.title;
     document.getElementById('edit-gid').value = source.gid;
@@ -439,10 +440,15 @@ function showEditDataModal(source) {
     const urlGroup = document.getElementById('edit-url-group');
     const editSheetUrl = document.getElementById('edit-sheet-url');
     
+    console.log('is_default value:', source.is_default);
+    console.log('URL group element:', urlGroup);
+    
     // Only allow URL editing for non-default sources
     if (source.is_default) {
+        console.log('Hiding URL field because is_default is true');
         urlGroup.style.display = 'none';
     } else {
+        console.log('Showing URL field because is_default is false');
         urlGroup.style.display = '';
         const currentUrl = `https://docs.google.com/spreadsheets/d/${source.spreadsheet_id}/edit#gid=${source.gid}`;
         editSheetUrl.value = currentUrl;
@@ -459,12 +465,18 @@ function hideEditDataModal() {
 // Edit function triggering the modal
 function startEdit(editBtn) {
     const sheetTab = editBtn.closest('.sheet-tab');
+    const isDefaultAttr = sheetTab.getAttribute('data-is-default');
+    console.log('Edit button clicked for:', sheetTab.querySelector('.tab-text').textContent);
+    console.log('data-is-default attribute:', isDefaultAttr);
+    console.log('Parsed is_default:', JSON.parse(isDefaultAttr));
+    
     const source = {
         title: sheetTab.querySelector('.tab-text').textContent,
         gid: sheetTab.getAttribute('data-sheet-gid'),
         spreadsheet_id: sheetTab.getAttribute('data-spreadsheet-id'),
-        is_default: JSON.parse(sheetTab.getAttribute('data-is-default'))
+        is_default: JSON.parse(isDefaultAttr)
     };
+    console.log('Source object:', source);
     showEditDataModal(source);
 }
 
