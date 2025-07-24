@@ -1,6 +1,8 @@
 // Version info for debugging
-console.log('Script version: 2025-01-24-1257-custom-domain');
+console.log('Script version: 2025-01-24-1259-aggressive-nocache');
+console.log('Script loaded at:', new Date().toISOString());
 console.log('Current domain:', window.location.hostname);
+console.log('Cache headers should prevent caching');
 
 // API 엔드포인트 설정 (배포 시 변경 필요)
 const API_BASE_URL = window.location.hostname === 'localhost' 
