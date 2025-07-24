@@ -44,7 +44,33 @@
       ]
     },
     {
-      "source": "/.*\\.(js|css|html)$/",
+      "source": "/(.*).js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate, max-age=0, s-maxage=0, proxy-revalidate"
+        },
+        {
+          "key": "Surrogate-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/(.*).css",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate, max-age=0, s-maxage=0, proxy-revalidate"
+        },
+        {
+          "key": "Surrogate-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/(.*).html",
       "headers": [
         {
           "key": "Cache-Control",
