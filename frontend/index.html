@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Qanda User GPT</title>
-    <link rel="stylesheet" href="styles.css?v=20250124-1313-final">
+    <link rel="stylesheet" href="styles.css?v=20250124-1332-modal-fix">
 </head>
 <body>
     <button class="add-data-btn" onclick="showAddDataModal()">Add Data Source</button>
@@ -140,21 +140,25 @@
         </div>
     </div>
 
-    <script src="script.js?v=20250124-1313-final"></script>
-    <!-- Deployment Version: 2025-01-24-1313-final-fix -->
+    <script src="script.js?v=20250124-1332-modal-fix"></script>
+    <!-- Deployment Version: 2025-01-24-1332-modal-fix -->
     <script>
         console.log('Page loaded at:', new Date().toISOString());
-        console.log('Version: 2025-01-24-1313-final-fix');
+        console.log('Version: 2025-01-24-1332-modal-fix');
         console.log('Domain:', window.location.hostname);
         // Force reload if old version detected
-        if (localStorage.getItem('app-version') !== '20250124-1313') {
-            localStorage.setItem('app-version', '20250124-1313');
+        if (localStorage.getItem('app-version') !== '20250124-1332') {
+            localStorage.setItem('app-version', '20250124-1332');
             console.log('New version detected, clearing cache...');
             if ('caches' in window) {
                 caches.keys().then(names => {
                     names.forEach(name => caches.delete(name));
                 });
             }
+            // Force reload page after cache clear
+            setTimeout(() => {
+                window.location.reload(true);
+            }, 100);
         }
     </script>
 </body>
