@@ -1,5 +1,5 @@
 // Version info for debugging
-console.log('Script version: 2025-01-24-1259-aggressive-nocache');
+console.log('Script version: 2025-01-24-1313-final');
 console.log('Script loaded at:', new Date().toISOString());
 console.log('Current domain:', window.location.hostname);
 console.log('Cache headers should prevent caching');
