@@ -356,7 +356,7 @@ def process_sheet_data(sheet_name, sheet_rows, user_question, sheet_date=None):
         # 학년 통계
         grade = row.get('현재 학년이 어떻게 되나요?', '').strip()
         if grade:
-            if grade in ['춈1', '춈2', '춈3', '춈4', '춈5', '춈6']:
+            if grade in ['춈8', '춈2', '춈3', '춈4', '춈5', '춈6']:
                 grade_stats['초등학생'] = grade_stats.get('초등학생', 0) + 1
             elif grade in ['중1', '중2', '중3']:
                 grade_stats['중학생'] = grade_stats.get('중학생', 0) + 1
@@ -366,7 +366,8 @@ def process_sheet_data(sheet_name, sheet_rows, user_question, sheet_date=None):
                 grade_stats[grade] = grade_stats.get(grade, 0) + 1
         
         # 지역 통계
-        region = row.get('현재 거주중인 지역이 어디인가요? ', '').strip()
+        region = row.get('현재 거주중인 지역이 어디인가요? ', '') or row.get('거주지역', '')
+        region = region.strip()
         if region:
             region_stats[region] = region_stats.get(region, 0) + 1
         
@@ -531,7 +532,7 @@ def create_prompt(user_question, sheet_data, search_results=None):
                     grade_stats['고등학생'] = grade_stats.get('고등학생', 0) + 1
             
             # 지역 통계 - Handle different column names
-            region = row.get('현재 거주중인 지역이 어디인가요? ', '') or row.get('지역', '')
+            region = row.get('현재 거주중인 지역이 어디인가요? ', '') or row.get('거주지역', '') or row.get('지역', '')
             region = region.strip()
             if region:
                 region_stats[region] = region_stats.get(region, 0) + 1
@@ -866,8 +867,45 @@ def chat():
             
             search_results = search_results[:5]  # 최대 5개 결과만 사용
         
-        # 프롬프트 생성 (웹 검색 결과 포함)
-        prompt = create_prompt(user_question, sheet_data, search_results)
+        # 대화 컨텍스트에서 필터링 조건 추출
+        context_filter = None
+        if conversation_history and len(conversation_history) > 0:
+            # "그 중에서", "그 중에", "위에서" 등의 표현 확인
+            context_keywords = ['그 중에서', '그 중에', '위에서', '이 중에서', '그들 중']
+            if any(keyword in user_question for keyword in context_keywords):
+                # 직전 대화에서 특정 그룹 찾기 (예: 고등학생, 중학생 등)
+                for msg in reversed(conversation_history):
+                    if msg.get('role') == 'assistant':
+                        content = msg.get('content', '')
+                        # 학년 그룹 찾기
+                        if '고등학생' in content and ('명' in content or '%' in content):
+                            context_filter = {'type': 'grade', 'value': ['고1', '고2', '고3']}
+                            print(f"Context filter detected: High school students")
+                            break
+                        elif '중학생' in content and ('명' in content or '%' in content):
+                            context_filter = {'type': 'grade', 'value': ['중1', '중2', '중3']}
+                            print(f"Context filter detected: Middle school students")
+                            break
+                        elif '초등학생' in content and ('명' in content or '%' in content):
+                            context_filter = {'type': 'grade', 'value': ['초1', '초2', '초3', '초4', '초5', '초6']}
+                            print(f"Context filter detected: Elementary school students")
+                            break
+        
+        # 컨텍스트 필터가 있으면 데이터 필터링
+        filtered_sheet_data = sheet_data
+        if context_filter:
+            filtered_sheet_data = []
+            for row in sheet_data:
+                grade = row.get('현재 학년이 어떻게 되나요?', '') or row.get('학년', '')
+                grade = grade.strip()
+                if '. ' in grade:
+                    grade = grade.split('. ')[1]
+                if grade in context_filter['value']:
+                    filtered_sheet_data.append(row)
+            print(f"Filtered data: {len(filtered_sheet_data)} out of {len(sheet_data)} rows")
+        
+        # 프롬프트 생성 (필터링된 데이터 사용)
+        prompt = create_prompt(user_question, filtered_sheet_data, search_results)
         
         # 디버깅을 위해 데이터 출력
         print(f"Sheet data retrieved: {len(sheet_data)} rows")
@@ -966,6 +1004,12 @@ def chat():
         data_context = f"{current_date.year}년 {current_date.month}월"
         
         system_prompt = f"""당신은 데이터 분석을 도와주는 친절한 어시스턴트입니다. 주어진 데이터를 기반으로 정확하게 답변해주세요.
+
+[최우선 규칙 - 대화 컨텍스트 이해]
+대화 히스토리가 있는 경우, 반드시 이전 대화 내용을 참고하여 답변해야 합니다.
+- "그 중에서", "그 중에", "위에서", "이 중에서" 등의 표현은 직전 대화에서 언급된 특정 그룹을 가리킵니다.
+- 예: 직전에 "고등학생 143명"을 언급했다면, "그 중에서 과외를 하는 학생"은 143명의 고등학생 중에서 과외를 하는 학생을 의미합니다.
+- 전체 데이터가 아닌, 직전에 언급된 하위 그룹에 대해 분석해야 합니다.
 
 [필수 규칙] 모든 답변은 다음 문장으로 시작해야 합니다:
 - "최근 수집된 조사 자료에 의하면,"
