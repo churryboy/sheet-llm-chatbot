@@ -7,40 +7,134 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <button class="add-data-btn" onclick="window.open('https://mathpresso.typeform.com/to/UCuYmizv#user_id=xxxxx', '_blank')">Add Data</button>
-    <div class="container">
-        <header>
-            <h1>Qanda User GPT</h1>
-            <p class="subtitle">학생한테 궁금한 점들을 아무거나 물어보세요</p>
-        </header>
+    <button class="add-data-btn" onclick="showAddDataModal()">Add Data Source</button>
+    
+    <!-- Add Data Source Modal -->
+    <div id="add-data-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add New Data Source</h2>
+                <span class="close" onclick="hideAddDataModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="add-data-form">
+                    <div class="form-group">
+                        <label for="data-title">Data Source Title</label>
+                        <input type="text" id="data-title" name="title" placeholder="e.g., Student Survey 2024" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="sheet-url">Google Sheets URL</label>
+                        <input type="url" id="sheet-url" name="url" placeholder="https://docs.google.com/spreadsheets/d/.../edit#gid=..." required>
+                        <small>Include the full URL with the #gid parameter</small>
+                    </div>
+                    <div class="form-buttons">
+                        <button type="button" class="btn-cancel" onclick="hideAddDataModal()">Cancel</button>
+                        <button type="submit" class="btn-submit">Add Data Source</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Edit Data Source Modal -->
+    <div id="edit-data-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Data Source</h2>
+                <span class="close" onclick="hideEditDataModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="edit-data-form">
+                    <input type="hidden" id="edit-gid" name="gid">
+                    <input type="hidden" id="edit-spreadsheet-id" name="spreadsheet_id">
+                    <input type="hidden" id="edit-is-default" name="is_default">
+                    <div class="form-group">
+                        <label for="edit-data-title">Data Source Title</label>
+                        <input type="text" id="edit-data-title" name="title" placeholder="e.g., Student Survey 2024" required>
+                    </div>
+                    <div class="form-group" id="edit-url-group">
+                        <label for="edit-sheet-url">Google Sheets URL</label>
+                        <input type="url" id="edit-sheet-url" name="url" placeholder="https://docs.google.com/spreadsheets/d/.../edit#gid=...">
+                        <small>Include the full URL with the #gid parameter</small>
+                    </div>
+                    <div class="form-buttons">
+                        <button type="button" class="btn-cancel" onclick="hideEditDataModal()">Cancel</button>
+                        <button type="submit" class="btn-submit">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Data Sources</h2>
+            </div>
+            <div class="sheet-tabs">
+                <button class="sheet-tab active" data-sheet-gid="187909252" data-sheet-name="Sheet1" onclick="selectSheet(this)">
+                    <span class="tab-icon">📊</span>
+                    <span class="tab-text">학생 성향</span>
+                </button>
+                <button class="sheet-tab" data-sheet-gid="2040429429" data-sheet-name="tablet behavior" onclick="selectSheet(this)">
+                    <span class="tab-icon">📱</span>
+                    <span class="tab-text">태블릿 공부 행태</span>
+                </button>
+            </div>
+        </aside>
+        <div class="main-content">
+            <header>
+                <h1>Qanda User GPT</h1>
+                <p class="subtitle">학생한테 궁금한 점들을 아무거나 물어보세요</p>
+            </header>
 
         <main>
-            <div class="chat-container">
-                <div id="chat-messages" class="chat-messages">
-                    <div class="message bot-message">
-                        <div class="message-content">
-                            안녕하세요! 학생들에 대해 궁금한 점을 물어보세요.<br>
-                            예시: "수학을 잘하는 학생은 누구인가요?", "어떤 학생들이 있나요?", "과학에 관심있는 학생들을 알려주세요"
+            <div class="main-container">
+                <!-- Data Overview Panel -->
+                <div class="data-overview-panel">
+                    <div class="panel-header">
+                <h3 id="data-overview-title">학생 성향 데이터</h3>
+                        <button class="refresh-btn" onclick="refreshDataOverview()" title="데이터 새로고침">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div id="data-overview" class="data-overview-content">
+                        <div class="loading-container">
+                            <div class="loading"></div>
+                            <p>데이터 분석 중...</p>
                         </div>
                     </div>
                 </div>
+                
+                <!-- Chat Container -->
+                <div class="chat-container">
+                    <div id="chat-messages" class="chat-messages">
+                        <div class="message bot-message">
+                            <div class="message-content">
+                                안녕하세요! "학생 성향" 데이터에서 궁금한 점을 물어보세요.
+                            </div>
+                        </div>
+                    </div>
 
-                <div class="input-container">
-                    <input 
-                        type="text" 
-                        id="user-input" 
-                        placeholder="질문을 입력하세요..."
-                        autofocus
-                    >
-                    <button id="send-button" onclick="sendMessage()">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="22" y1="2" x2="11" y2="13"></line>
-                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                        </svg>
-                    </button>
+                    <div class="input-container">
+                        <input 
+                            type="text" 
+                            id="user-input" 
+                            placeholder="질문을 입력하세요..."
+                            autofocus
+                        >
+                        <button id="send-button" onclick="sendMessage()">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
         </main>
+        </div>
     </div>
 
     <script src="script.js"></script>
