@@ -2144,7 +2144,7 @@ def get_data_sources():
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """헬스 체크 엔드포인트"""
-    return jsonify_unicode({'status': 'ok', 'version': 'v3-multi-sheet-support'})
+    return jsonify_unicode({'status': 'ok', 'version': 'v3.1-interview-edit-fix-2025-01-25'})
 
 @app.route('/api/debug/sheet-data', methods=['GET'])
 def debug_sheet_data():
