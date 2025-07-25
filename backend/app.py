@@ -2108,6 +2108,47 @@ def update_data_source():
         print(f"Error in update-data-source endpoint: {str(e)}")
         return jsonify({'error': f'처리 중 오류가 발생했습니다: {str(e)}'}), 500
 
+@app.route('/api/delete-data-source', methods=['DELETE'])
+def delete_data_source():
+    """Delete a custom data source"""
+    try:
+        data = request.json
+        gid = data.get('gid', '')
+        spreadsheet_id = data.get('spreadsheet_id', '')
+        document_id = data.get('document_id', '')
+        data_type = data.get('type', 'survey')
+        
+        # Cannot delete default sheets
+        if data_type == 'survey' and spreadsheet_id == SPREADSHEET_ID:
+            return jsonify({'error': 'Cannot delete default sheets'}), 403
+        
+        # Load custom data sources
+        sources = load_data_sources()
+        
+        # Find and remove the source
+        original_count = len(sources)
+        
+        if data_type == 'interview':
+            # For interview sources, match by document_id
+            sources = [s for s in sources if not (s.get('type') == 'interview' and s.get('document_id') == document_id)]
+        else:
+            # For survey sources, match by gid and spreadsheet_id
+            sources = [s for s in sources if not (s.get('gid') == gid and s.get('spreadsheet_id') == spreadsheet_id)]
+        
+        if len(sources) < original_count:
+            # Source was found and removed
+            save_data_sources(sources)
+            return jsonify_unicode({
+                'status': 'success',
+                'message': 'Data source deleted successfully'
+            })
+        else:
+            return jsonify({'error': 'Data source not found'}), 404
+    
+    except Exception as e:
+        print(f"Error in delete-data-source endpoint: {str(e)}")
+        return jsonify({'error': f'처리 중 오류가 발생했습니다: {str(e)}'}), 500
+
 @app.route('/api/data-sources', methods=['GET'])
 def get_data_sources():
     """Get all data sources including custom ones"""

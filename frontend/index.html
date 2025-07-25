@@ -10,8 +10,6 @@
     <link rel="stylesheet" href="styles.css?v=20250124-1332-modal-fix">
 </head>
 <body>
-    <button class="add-data-btn" onclick="showAddDataModal()">Add Data Source</button>
-    
     <!-- Add Data Source Modal -->
     <div id="add-data-modal" class="modal">
         <div class="modal-content">
@@ -84,6 +82,7 @@
                         <small>Include the full URL with the #gid parameter</small>
                     </div>
                     <div class="form-buttons">
+                        <button type="button" class="btn-delete" onclick="deleteDataSourceFromModal()">Delete Data Source</button>
                         <button type="button" class="btn-cancel" onclick="hideEditDataModal()">Cancel</button>
                         <button type="submit" class="btn-submit">Save Changes</button>
                     </div>
@@ -95,6 +94,7 @@
         <aside class="sidebar">
             <div class="sidebar-header">
                 <h2>Data Sources</h2>
+                <button class="add-data-btn sidebar-add-btn" onclick="showAddDataModal()">+ Add Data Source</button>
             </div>
             <div class="sheet-tabs">
                 <!-- Data sources will be loaded dynamically -->

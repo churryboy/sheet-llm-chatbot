@@ -312,8 +312,19 @@ async function loadDataSources() {
         // Clear existing tabs
         sheetTabs.innerHTML = '';
         
+        // Sort data sources by creation date (newest first)
+        const sortedSources = data.sources.sort((a, b) => {
+            // Default sources (without added_at) come first
+            if (!a.added_at && !b.added_at) return 0;
+            if (!a.added_at) return -1;
+            if (!b.added_at) return 1;
+            
+            // Sort by added_at date (newest first)
+            return new Date(b.added_at) - new Date(a.added_at);
+        });
+        
         // Add tabs for each data source
-        data.sources.forEach((source, index) => {
+        sortedSources.forEach((source, index) => {
             const button = document.createElement('button');
             button.className = 'sheet-tab';
             if (index === 0) button.classList.add('active');
@@ -324,8 +335,8 @@ async function loadDataSources() {
             button.setAttribute('data-source-type', source.type || 'survey');
             button.setAttribute('data-is-default', source.is_default);
             button.onclick = function(e) { 
-                // Only select sheet if not clicking on edit controls
-                if (!e.target.closest('.edit-btn, .save-btn, .cancel-btn, .edit-input')) {
+                // Only select sheet if not clicking on edit/delete controls
+                if (!e.target.closest('.edit-btn, .delete-btn, .save-btn, .cancel-btn, .edit-input')) {
                     selectSheet(this); 
                 }
             };
@@ -351,12 +362,14 @@ async function loadDataSources() {
         });
         
         // Update current sheet info if needed
-        if (data.sources.length > 0) {
-            const firstSource = data.sources[0];
+        if (sortedSources.length > 0) {
+            const firstSource = sortedSources[0];
             currentSheet = {
                 gid: firstSource.gid,
                 name: firstSource.title,
-                spreadsheet_id: firstSource.spreadsheet_id
+                spreadsheet_id: firstSource.spreadsheet_id,
+                document_id: firstSource.document_id,
+                type: firstSource.type
             };
         }
         
@@ -638,10 +651,13 @@ function showEditDataModal(source) {
     
     const urlGroup = document.getElementById('edit-url-group');
     const editSheetUrl = document.getElementById('edit-sheet-url');
+    const deleteBtn = document.querySelector('#edit-data-modal .btn-delete');
     
     console.log('is_default value:', source.is_default);
     console.log('source type:', source.type);
     console.log('URL group element:', urlGroup);
+    console.log('Delete button element:', deleteBtn);
+    console.log('Delete button initial display:', deleteBtn ? deleteBtn.style.display : 'button not found');
     
     // Hide URL field for interview sources or default sources
     if (source.type === 'interview' || source.is_default) {
@@ -654,12 +670,80 @@ function showEditDataModal(source) {
         editSheetUrl.value = currentUrl;
     }
     
+    // Always show/hide delete button based on is_default
+    if (deleteBtn) {
+        if (source.is_default === true || source.is_default === 'true') {
+            console.log('Hiding delete button for default source');
+            deleteBtn.style.display = 'none';
+        } else {
+            console.log('Showing delete button for custom source');
+            deleteBtn.style.display = 'inline-block';
+            deleteBtn.style.visibility = 'visible';
+        }
+    } else {
+        console.error('Delete button not found in modal!');
+        // Try to find it again after a small delay
+        setTimeout(() => {
+            const delBtn = document.querySelector('#edit-data-modal .btn-delete');
+            if (delBtn) {
+                if (source.is_default === true || source.is_default === 'true') {
+                    delBtn.style.display = 'none';
+                } else {
+                    delBtn.style.display = 'inline-block';
+                    delBtn.style.visibility = 'visible';
+                }
+            }
+        }, 100);
+    }
+    
     modal.style.display = 'block';
 }
 
 function hideEditDataModal() {
     const modal = document.getElementById('edit-data-modal');
     modal.style.display = 'none';
+}
+
+// Delete data source function from sidebar
+async function deleteDataSource(deleteBtn) {
+    const sheetTab = deleteBtn.closest('.sheet-tab');
+    const title = sheetTab.querySelector('.tab-text').textContent;
+    const gid = sheetTab.getAttribute('data-sheet-gid');
+    const spreadsheetId = sheetTab.getAttribute('data-spreadsheet-id');
+    const documentId = sheetTab.getAttribute('data-document-id');
+    const sourceType = sheetTab.getAttribute('data-source-type');
+    
+    // Confirm deletion
+    if (!confirm(`Are you sure you want to delete "${title}"?\n\nThis action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/delete-data-source`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                gid: gid,
+                spreadsheet_id: spreadsheetId,
+                document_id: documentId,
+                type: sourceType
+            })
+        });
+        
+        if (response.ok) {
+            alert('Data source deleted successfully!');
+            // Reload to refresh the list
+            location.reload();
+        } else {
+            const error = await response.json();
+            alert('Failed to delete data source: ' + (error.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error deleting data source:', error);
+        alert('Failed to delete data source. Please check your connection.');
+    }
 }
 
 // Edit function triggering the modal
@@ -682,6 +766,55 @@ function startEdit(editBtn) {
     };
     console.log('Source object:', source);
     showEditDataModal(source);
+}
+
+// Delete data source function from modal
+async function deleteDataSourceFromModal() {
+    const title = document.getElementById('edit-data-title').value;
+    const gid = document.getElementById('edit-gid').value;
+    const spreadsheetId = document.getElementById('edit-spreadsheet-id').value;
+    const documentId = document.getElementById('edit-document-id').value;
+    const sourceType = document.getElementById('edit-source-type').value;
+    const isDefault = JSON.parse(document.getElementById('edit-is-default').value);
+    
+    // Double check - should not delete default sources
+    if (isDefault) {
+        alert('Cannot delete default data sources.');
+        return;
+    }
+    
+    // Confirm deletion
+    if (!confirm(`Are you sure you want to delete "${title}"?\n\nThis action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/delete-data-source`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                gid: gid,
+                spreadsheet_id: spreadsheetId,
+                document_id: documentId,
+                type: sourceType
+            })
+        });
+        
+        if (response.ok) {
+            alert('Data source deleted successfully!');
+            hideEditDataModal();
+            // Reload to refresh the list
+            location.reload();
+        } else {
+            const error = await response.json();
+            alert('Failed to delete data source: ' + (error.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error deleting data source:', error);
+        alert('Failed to delete data source. Please check your connection.');
+    }
 }
 
 // Handle edit form submission
