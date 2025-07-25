@@ -26,9 +26,30 @@
                         <input type="text" id="data-title" name="title" placeholder="e.g., Student Survey 2024" required>
                     </div>
                     <div class="form-group">
+                        <label>Data Type</label>
+                        <div class="data-type-buttons">
+                            <button type="button" class="type-btn active" id="type-survey" onclick="selectDataType('survey')">
+                                <span class="type-icon">📊</span>
+                                <span class="type-label">Survey Data</span>
+                                <span class="type-desc">Google Sheets</span>
+                            </button>
+                            <button type="button" class="type-btn" id="type-interview" onclick="selectDataType('interview')">
+                                <span class="type-icon">📝</span>
+                                <span class="type-label">Interview Data</span>
+                                <span class="type-desc">Google Docs</span>
+                            </button>
+                        </div>
+                        <input type="hidden" id="data-type" name="type" value="survey" required>
+                    </div>
+                    <div class="form-group" id="sheet-url-group">
                         <label for="sheet-url">Google Sheets URL</label>
                         <input type="url" id="sheet-url" name="url" placeholder="https://docs.google.com/spreadsheets/d/.../edit#gid=..." required>
                         <small>Include the full URL with the #gid parameter</small>
+                    </div>
+                    <div class="form-group" id="doc-url-group" style="display: none;">
+                        <label for="doc-url">Google Docs URL</label>
+                        <input type="url" id="doc-url" name="doc_url" placeholder="https://docs.google.com/document/d/.../edit">
+                        <small>Paste the Google Docs share URL</small>
                     </div>
                     <div class="form-buttons">
                         <button type="button" class="btn-cancel" onclick="hideAddDataModal()">Cancel</button>
@@ -51,6 +72,8 @@
                     <input type="hidden" id="edit-gid" name="gid">
                     <input type="hidden" id="edit-spreadsheet-id" name="spreadsheet_id">
                     <input type="hidden" id="edit-is-default" name="is_default">
+                    <input type="hidden" id="edit-source-type" name="source_type">
+                    <input type="hidden" id="edit-document-id" name="document_id">
                     <div class="form-group">
                         <label for="edit-data-title">Data Source Title</label>
                         <input type="text" id="edit-data-title" name="title" placeholder="e.g., Student Survey 2024" required>
