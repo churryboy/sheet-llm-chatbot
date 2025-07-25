@@ -5,6 +5,7 @@ from json_unicode import jsonify_unicode
 from functools import wraps
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from anthropic import Anthropic
 from dotenv import load_dotenv
 import json
@@ -80,6 +81,351 @@ def load_data_sources():
             print(f"Error loading data sources: {e}")
     print(f"[DEBUG] No custom sources found")
     return []
+
+def extract_interview_description(content):
+    """Extract a brief description of the interview content (max 4 sentences)"""
+    lines = content.split('\n')
+    
+    # Look for key topics discussed in the interview
+    topics = []
+    keywords = {
+        'GPT': 'AI/GPT 활용',
+        'LLM': 'LLM 서비스',
+        '공부': '학습 방법',
+        '수학': '수학 학습',
+        '과외': '과외',
+        '학원': '학원',
+        '예체능': '예체능',
+        '대학': '대학 진학',
+        '시험': '시험',
+        '성적': '성적',
+        'ChatGPT': 'ChatGPT',
+        '인공지능': 'AI',
+        '학습': '학습',
+        '교육': '교육'
+    }
+    
+    # Count keyword occurrences
+    keyword_counts = {}
+    for line in lines:
+        for keyword, topic in keywords.items():
+            if keyword in line:
+                keyword_counts[topic] = keyword_counts.get(topic, 0) + 1
+    
+    # Get top topics
+    if keyword_counts:
+        sorted_topics = sorted(keyword_counts.items(), key=lambda x: x[1], reverse=True)
+        topics = [topic for topic, _ in sorted_topics[:3]]
+    
+    # Extract participant count and grades
+    participant_grades = []
+    for line in lines:
+        if '고1' in line or '고등학교 1학년' in line:
+            if '고1' not in participant_grades:
+                participant_grades.append('고1')
+        elif '고2' in line or '고등학교 2학년' in line:
+            if '고2' not in participant_grades:
+                participant_grades.append('고2')
+        elif '고3' in line or '고등학교 3학년' in line:
+            if '고3' not in participant_grades:
+                participant_grades.append('고3')
+        elif '중1' in line or '중학교 1학년' in line:
+            if '중1' not in participant_grades:
+                participant_grades.append('중1')
+        elif '중2' in line or '중학교 2학년' in line:
+            if '중2' not in participant_grades:
+                participant_grades.append('중2')
+        elif '중3' in line or '중학교 3학년' in line:
+            if '중3' not in participant_grades:
+                participant_grades.append('중3')
+    
+    # Build description
+    description_parts = []
+    
+    # First sentence: participant info
+    if participant_grades:
+        grades_str = ', '.join(participant_grades)
+        description_parts.append(f"{grades_str} 학생들을 대상으로 진행된 인터뷰입니다.")
+    else:
+        description_parts.append("학생들을 대상으로 진행된 인터뷰입니다.")
+    
+    # Second sentence: main topics
+    if topics:
+        topics_str = ', '.join(topics[:3])
+        description_parts.append(f"주요 주제는 {topics_str} 등입니다.")
+    
+    # Third sentence: Look for specific content patterns
+    if 'GPT' in content or 'ChatGPT' in content or 'LLM' in content:
+        if '수학' in content:
+            description_parts.append("AI 도구를 활용한 수학 학습 경험에 대해 논의했습니다.")
+        else:
+            description_parts.append("AI 학습 도구 사용 경험에 대해 논의했습니다.")
+    elif '학원' in content or '과외' in content:
+        description_parts.append("사교육 경험과 학습 방법에 대해 이야기했습니다.")
+    
+    # Limit to 4 sentences
+    description = ' '.join(description_parts[:4])
+    
+    return description
+
+def extract_participant_info(content):
+    """Extract participant information from interview transcript"""
+    participants = []
+    
+    # Common patterns for participant information in Korean interviews
+    lines = content.split('\n')
+    
+    # First, identify all speakers from the transcript
+    speakers = {}
+    for line in lines:
+        if ':' in line:
+            speaker = line.split(':')[0].strip()
+            # Skip time stamps (like 00:00:00 or 00:12:00)
+            if ':' in speaker and speaker.replace(':', '').isdigit():
+                continue
+            # Skip empty or very short names
+            if speaker and len(speaker) >= 2 and len(speaker) < 20:  # Reasonable speaker name length
+                if speaker not in speakers:
+                    speakers[speaker] = {
+                        'name': speaker,
+                        'age': None,
+                        'school': None,
+                        'school_year': None,
+                        'gender': None,
+                        'major': None,  # Added for college students
+                        'lines': [],
+                        'info_lines': []  # Lines that contain their personal info
+                    }
+                speakers[speaker]['lines'].append(line)
+    
+    # Filter out common interviewer indicators and non-participant entries
+    interviewer_keywords = ['Irene', 'Kang', '연구', '리서처', 'researcher', '인터뷰어', '강예린']
+    non_participant_keywords = ['발표', '님의', '00', 'presentation', '선생님', '교수님', '사회자']
+    interviewees = {}
+    
+    for speaker_name, speaker_data in speakers.items():
+        # Skip if it's an interviewer
+        is_interviewer = any(keyword.lower() in speaker_name.lower() for keyword in interviewer_keywords)
+        # Skip if it contains non-participant keywords
+        is_non_participant = any(keyword in speaker_name for keyword in non_participant_keywords)
+        # Skip if it's just numbers or too short
+        is_invalid = speaker_name.isdigit() or len(speaker_name) <= 1
+        
+        if not is_interviewer and not is_non_participant and not is_invalid:
+            interviewees[speaker_name] = speaker_data
+    
+    # Now analyze the content to extract participant information
+    current_speaker = None
+    context_lines = []  # Keep track of recent lines for context
+    
+    for i, line in enumerate(lines):
+        # Update current speaker
+        if ':' in line:
+            speaker = line.split(':')[0].strip()
+            if speaker in interviewees:
+                current_speaker = speaker
+        
+        # Keep context of last 10 lines
+        context_lines.append(line)
+        if len(context_lines) > 10:
+            context_lines.pop(0)
+        
+        # Extract information patterns
+        if current_speaker and current_speaker in interviewees:
+            participant = interviewees[current_speaker]
+            
+            # Pattern 1: School year information
+            if '학년' in line:
+                # High school patterns
+                if '고등학교' in line or '고등학생' in line or '고' in line:
+                    if '1학년' in line or '일학년' in line or '고1' in line:
+                        participant['school_year'] = '고1'
+                    elif '2학년' in line or '이학년' in line or '고2' in line:
+                        participant['school_year'] = '고2'
+                    elif '3학년' in line or '삼학년' in line or '고3' in line:
+                        participant['school_year'] = '고3'
+                # Middle school patterns
+                elif '중학교' in line or '중학생' in line or '중' in line:
+                    if '1학년' in line or '일학년' in line or '중1' in line:
+                        participant['school_year'] = '중1'
+                    elif '2학년' in line or '이학년' in line or '중2' in line:
+                        participant['school_year'] = '중2'
+                    elif '3학년' in line or '삼학년' in line or '중3' in line:
+                        participant['school_year'] = '중3'
+                # University patterns
+                elif '대학' in line:
+                    if '1학년' in line:
+                        participant['school_year'] = '대1'
+                    elif '2학년' in line:
+                        participant['school_year'] = '대2'
+                    elif '3학년' in line:
+                        participant['school_year'] = '대3'
+                    elif '4학년' in line:
+                        participant['school_year'] = '대4'
+                
+                participant['info_lines'].append(line)
+            
+            # Pattern 2: Birth year for age
+            if '년생' in line:
+                import re
+                # Look for patterns like "08년생" or "2008년생"
+                year_matches = re.findall(r'(\d{2,4})년생', line)
+                if year_matches:
+                    birth_year = year_matches[0]
+                    if len(birth_year) == 2:
+                        # Convert 2-digit year to 4-digit
+                        # Assume 00-25 is 2000-2025, 26-99 is 1926-1999
+                        year_int = int(birth_year)
+                        if year_int <= 25:
+                            birth_year = '20' + birth_year
+                        else:
+                            birth_year = '19' + birth_year
+                    current_year = datetime.now().year
+                    age = current_year - int(birth_year) + 1  # Korean age
+                    participant['age'] = age
+                    participant['info_lines'].append(line)
+            
+            # Pattern 3: School name
+            if '학교' in line:
+                import re
+                # Look for school names
+                school_patterns = [
+                    r'([가-힣]+(?:초등학교|중학교|고등학교|대학교))',
+                    r'([가-힣]+고등학교)',
+                    r'([가-힣]+중학교)',
+                    r'([가-힣]+대학교)',
+                    r'([가-힣]+대학)'
+                ]
+                for pattern in school_patterns:
+                    school_match = re.search(pattern, line)
+                    if school_match:
+                        participant['school'] = school_match.group(1)
+                        participant['info_lines'].append(line)
+                        break
+            
+            # Pattern 4: Major (for university students)
+            if '전공' in line or '학과' in line or '과' in line:
+                if '예체능' in line:
+                    participant['major'] = '예체능'
+                elif '공대' in line or '공학' in line:
+                    participant['major'] = '공학'
+                elif '문과' in line:
+                    participant['major'] = '문과'
+                elif '이과' in line:
+                    participant['major'] = '이과'
+                participant['info_lines'].append(line)
+            
+            # Pattern 5: Gender (if mentioned)
+            if '남학생' in line or '남자' in line:
+                participant['gender'] = '남'
+                participant['info_lines'].append(line)
+            elif '여학생' in line or '여자' in line:
+                participant['gender'] = '여'
+                participant['info_lines'].append(line)
+    
+    # Convert to list format
+    for speaker_name, data in interviewees.items():
+        # Clean up the data
+        participant_info = {
+            'name': data['name'],
+            'age': data['age'],
+            'school': data['school'],
+            'school_year': data['school_year'],
+            'gender': data['gender'],
+            'major': data['major'],
+            'summary': []  # Summary of key information
+        }
+        
+        # Build summary
+        if data['school_year']:
+            participant_info['summary'].append(data['school_year'])
+        if data['age']:
+            participant_info['summary'].append(f"{data['age']}세")
+        if data['school']:
+            participant_info['summary'].append(data['school'])
+        if data['major']:
+            participant_info['summary'].append(data['major'])
+        
+        participants.append(participant_info)
+    
+    return participants
+
+def get_google_docs_content(document_id):
+    """Fetch content from Google Docs using the document ID"""
+    try:
+        # First, try to fetch directly via HTTP for public documents
+        # This works for documents that are publicly accessible
+        export_url = f"https://docs.google.com/document/d/{document_id}/export?format=txt"
+        
+        print(f"Attempting to fetch document via direct HTTP: {document_id}")
+        response = requests.get(export_url, allow_redirects=True)
+        
+        if response.status_code == 200:
+            # Successfully fetched the document
+            content = response.text
+            print(f"Successfully fetched document content: {len(content)} characters")
+            return content.strip()
+        elif response.status_code == 403:
+            print(f"Access denied to document {document_id}. Trying API method...")
+        else:
+            print(f"HTTP {response.status_code} when fetching document. Trying API method...")
+        
+        # If direct HTTP failed, try using service account credentials
+        if os.path.exists('credentials.json'):
+            credentials = service_account.Credentials.from_service_account_file(
+                'credentials.json',
+                scopes=['https://www.googleapis.com/auth/documents.readonly']
+            )
+            service = build('docs', 'v1', credentials=credentials)
+            
+            # Retrieve the document
+            document = service.documents().get(documentId=document_id).execute()
+            
+            # Extract the text content
+            content = ""
+            for element in document.get('body', {}).get('content', []):
+                if 'paragraph' in element:
+                    for text_element in element['paragraph'].get('elements', []):
+                        if 'textRun' in text_element:
+                            content += text_element['textRun'].get('content', '')
+            
+            return content.strip()
+        else:
+            # Try using API key
+            api_key = os.getenv('GOOGLE_API_KEY')
+            if api_key and api_key != 'your_google_api_key_here':
+                service = build('docs', 'v1', developerKey=api_key)
+                
+                # Retrieve the document
+                document = service.documents().get(documentId=document_id).execute()
+                
+                # Extract the text content
+                content = ""
+                for element in document.get('body', {}).get('content', []):
+                    if 'paragraph' in element:
+                        for text_element in element['paragraph'].get('elements', []):
+                            if 'textRun' in text_element:
+                                content += text_element['textRun'].get('content', '')
+                
+                return content.strip()
+            else:
+                print("Warning: No Google API credentials found for Docs API")
+                # If we couldn't fetch via HTTP and have no API credentials, return None
+                if response.status_code != 200:
+                    return None
+    
+    except HttpError as e:
+        if e.resp.status == 403:
+            print(f"Access denied to document {document_id}. The document might be private.")
+        elif e.resp.status == 404:
+            print(f"Document {document_id} not found.")
+        else:
+            print(f"HTTP error {e.resp.status} when accessing document {document_id}: {e.content}")
+        return None
+    
+    except Exception as e:
+        print(f"Error fetching Google Docs content: {str(e)}")
+        return None
 
 # Save custom data sources
 def save_data_sources(sources):
@@ -466,10 +812,22 @@ def create_prompt(user_question, sheet_data, search_results=None):
     # Initialize filtered_data to avoid undefined variable error
     filtered_data = sheet_data if sheet_data else []
     
-    # 1. 구글 시트 데이터 섹션
+    # Check if this is interview data
+    is_interview_data = (sheet_data and len(sheet_data) > 0 and 
+                        sheet_data[0].get('_source_type') == 'interview')
+    
+    # 1. 데이터 섹션
     data_str = ""
     if sheet_data and len(sheet_data) > 0:
-        data_str = "=== 구글 시트 데이터 ===\n\n"
+        if is_interview_data:
+            # Handle interview data
+            data_str = "=== 인터뷰 데이터 ===\n\n"
+            data_str += f"문서 ID: {sheet_data[0].get('document_id')}\n"
+            data_str += "\n인터뷰 내용:\n"
+            data_str += sheet_data[0].get('content', '인터뷰 내용을 불러올 수 없습니다.') + "\n"
+        else:
+            # Handle survey data
+            data_str = "=== 구글 시트 데이터 ===\n\n"
         
         # Get survey date from data
         survey_date = None
@@ -822,35 +1180,64 @@ def chat():
         if not user_question:
             return jsonify({'error': '질문을 입력해주세요.'}), 400
         
-        # Get spreadsheet_id from request
+        # Get source type and document_id from request
+        source_type = data.get('source_type', 'survey')
+        document_id = data.get('document_id', None)
         spreadsheet_id = data.get('spreadsheet_id', SPREADSHEET_ID)
         
-        # Determine which sheet(s) to query based on question if not explicitly specified
-        if not sheet_gid and not sheet_name:
-            sheets_to_query = determine_sheet_context(user_question)
-        else:
-            # Use the explicitly provided sheet
-            sheets_to_query = [{
-                'gid': sheet_gid or DEFAULT_SHEET_GID,
-                'name': sheet_name or 'Sheet1'
-            }]
-        
-        # Get data from all relevant sheets
-        sheet_data = []
-        access_errors = []
-        for sheet in sheets_to_query:
-            # Use the provided spreadsheet_id for custom sheets
-            data = get_sheet_data_by_gid(sheet['gid'], sheet['name'], spreadsheet_id)
-            if not data:
-                # Check if this is a custom sheet that failed to load
-                if spreadsheet_id != SPREADSHEET_ID:
-                    access_errors.append({
-                        'sheet_name': sheet['name'],
-                        'spreadsheet_id': spreadsheet_id,
-                        'gid': sheet['gid']
-                    })
+        # Handle interview data source (Google Docs)
+        if source_type == 'interview' and document_id:
+            # Fetch the actual content from Google Docs
+            print(f"Fetching interview data from document: {document_id}")
+            doc_content = get_google_docs_content(document_id)
+            
+            if doc_content:
+                interview_data = [{
+                    '_source_type': 'interview',
+                    'document_id': document_id,
+                    'content': doc_content
+                }]
+                print(f"Successfully fetched interview content: {len(doc_content)} characters")
             else:
-                sheet_data.extend(data)
+                # If we couldn't fetch the content, provide an error message
+                interview_data = [{
+                    '_source_type': 'interview',
+                    'document_id': document_id,
+                    'content': f"인터뷰 문서를 불러올 수 없습니다. 문서가 공개되어 있거나 적절한 권한이 설정되어 있는지 확인해주세요.\n\n문서 ID: {document_id}\n\n해결 방법:\n1. Google Docs에서 문서를 열어 '공유' 버튼을 클릭합니다\n2. '링크가 있는 모든 사용자'를 선택하고 '뷰어' 권한을 부여합니다\n3. 또는 서비스 계정 이메일에 문서를 공유합니다"
+                }]
+                print(f"Failed to fetch interview content from document: {document_id}")
+            
+            sheet_data = interview_data
+            access_errors = []
+            sheets_to_query = []  # Empty list for interview data
+        else:
+            # Handle survey data source (Google Sheets)
+            # Determine which sheet(s) to query based on question if not explicitly specified
+            if not sheet_gid and not sheet_name:
+                sheets_to_query = determine_sheet_context(user_question)
+            else:
+                # Use the explicitly provided sheet
+                sheets_to_query = [{
+                    'gid': sheet_gid or DEFAULT_SHEET_GID,
+                    'name': sheet_name or 'Sheet1'
+                }]
+            
+            # Get data from all relevant sheets
+            sheet_data = []
+            access_errors = []
+            for sheet in sheets_to_query:
+                # Use the provided spreadsheet_id for custom sheets
+                data = get_sheet_data_by_gid(sheet['gid'], sheet['name'], spreadsheet_id)
+                if not data:
+                    # Check if this is a custom sheet that failed to load
+                    if spreadsheet_id != SPREADSHEET_ID:
+                        access_errors.append({
+                            'sheet_name': sheet['name'],
+                            'spreadsheet_id': spreadsheet_id,
+                            'gid': sheet['gid']
+                        })
+                else:
+                    sheet_data.extend(data)
         
         print(f"Total data from {len(sheets_to_query)} sheet(s): {len(sheet_data)} rows")
         
@@ -1307,6 +1694,53 @@ def list_sheets():
         print(f"Error listing sheets: {str(e)}")
         return jsonify({'error': f'처리 중 오류가 발생했습니다: {str(e)}'}), 500
 
+@app.route('/api/interview-info', methods=['POST'])
+def get_interview_info():
+    """Get participant information from interview document"""
+    try:
+        data = request.json
+        document_id = data.get('document_id', '')
+        
+        if not document_id:
+            return jsonify({'error': 'Missing document_id'}), 400
+        
+        # Fetch document content
+        doc_content = get_google_docs_content(document_id)
+        
+        if not doc_content:
+            return jsonify_unicode({
+                'error': 'Could not fetch document content',
+                'participants': []
+            }), 404
+        
+        # Extract participant information
+        participants = extract_participant_info(doc_content)
+        
+        # Get interview date from content if possible
+        interview_date = None
+        lines = doc_content.split('\n')
+        for line in lines[:10]:  # Check first 10 lines for date
+            if '2025' in line or '2024' in line or '2023' in line:
+                # Try to extract date
+                import re
+                date_match = re.search(r'(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일', line)
+                if date_match:
+                    year = date_match.group(1)
+                    month = date_match.group(2)
+                    day = date_match.group(3)
+                    interview_date = f"{year}년 {month}월 {day}일"
+                    break
+        
+        return jsonify_unicode({
+            'participants': participants,
+            'interview_date': interview_date,
+            'total_participants': len(participants)
+        })
+    
+    except Exception as e:
+        print(f"Error in interview-info endpoint: {str(e)}")
+        return jsonify({'error': f'처리 중 오류가 발생했습니다: {str(e)}'}), 500
+
 @app.route('/api/sheet-info', methods=['POST'])
 def get_sheet_info():
     """Get detailed information about a specific sheet"""
@@ -1315,7 +1749,53 @@ def get_sheet_info():
         sheet_gid = data.get('sheet_gid', DEFAULT_SHEET_GID)
         sheet_name = data.get('sheet_name', 'Sheet1')
         spreadsheet_id = data.get('spreadsheet_id', SPREADSHEET_ID)
+        source_type = data.get('source_type', 'survey')
+        document_id = data.get('document_id', None)
         
+        # Handle interview data
+        if source_type == 'interview' and document_id:
+            # Fetch document content
+            doc_content = get_google_docs_content(document_id)
+            
+            if not doc_content:
+                return jsonify_unicode({
+                    'source_type': 'interview',
+                    'participants': [],
+                    'interview_date': None,
+                    'total_participants': 0,
+                    'error': 'Could not fetch document content'
+                })
+            
+            # Extract participant information
+            participants = extract_participant_info(doc_content)
+            
+            # Extract interview description
+            description = extract_interview_description(doc_content)
+            
+            # Get interview date from content if possible
+            interview_date = None
+            lines = doc_content.split('\n')
+            for line in lines[:10]:  # Check first 10 lines for date
+                if '2025' in line or '2024' in line or '2023' in line:
+                    # Try to extract date
+                    import re
+                    date_match = re.search(r'(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일', line)
+                    if date_match:
+                        year = date_match.group(1)
+                        month = date_match.group(2)
+                        day = date_match.group(3)
+                        interview_date = f"{year}년 {month}월 {day}일"
+                        break
+            
+            return jsonify_unicode({
+                'source_type': 'interview',
+                'participants': participants,
+                'description': description,
+                'interview_date': interview_date,
+                'total_participants': len(participants)
+            })
+        
+        # Handle survey data (existing code)
         # Get sheet data
         sheet_data = get_sheet_data_by_gid(sheet_gid, sheet_name, spreadsheet_id)
         
@@ -1417,31 +1897,62 @@ def get_sheet_info():
 
 @app.route('/api/add-data-source', methods=['POST'])
 def add_data_source():
-    """Add a new custom data source from Google Sheets URL"""
+    """Add a new custom data source from Google Sheets or Google Docs URL"""
     try:
         data = request.json
         title = data.get('title', '')
-        spreadsheet_id = data.get('spreadsheet_id', '')
-        gid = data.get('gid', '')
+        data_type = data.get('type', 'survey')  # Default to survey for backward compatibility
         
-        if not title or not spreadsheet_id or not gid:
-            return jsonify({'error': 'Missing required fields: title, spreadsheet_id, or gid'}), 400
+        if not title:
+            return jsonify({'error': 'Missing required field: title'}), 400
         
         # Load existing data sources
         sources = load_data_sources()
         
-        # Check if GID already exists
-        for source in sources:
-            if source['gid'] == gid and source['spreadsheet_id'] == spreadsheet_id:
-                return jsonify({'error': 'This sheet is already added'}), 409
+        if data_type == 'survey':
+            # Handle Google Sheets data source
+            spreadsheet_id = data.get('spreadsheet_id', '')
+            gid = data.get('gid', '')
+            
+            if not spreadsheet_id or not gid:
+                return jsonify({'error': 'Missing required fields for survey data: spreadsheet_id or gid'}), 400
+            
+            # Check if GID already exists
+            for source in sources:
+                if source.get('gid') == gid and source.get('spreadsheet_id') == spreadsheet_id:
+                    return jsonify({'error': 'This sheet is already added'}), 409
+            
+            # Add new survey source
+            new_source = {
+                'title': title,
+                'type': 'survey',
+                'spreadsheet_id': spreadsheet_id,
+                'gid': gid,
+                'added_at': datetime.now().isoformat()
+            }
+            
+        elif data_type == 'interview':
+            # Handle Google Docs data source
+            document_id = data.get('document_id', '')
+            
+            if not document_id:
+                return jsonify({'error': 'Missing required field for interview data: document_id'}), 400
+            
+            # Check if document already exists
+            for source in sources:
+                if source.get('document_id') == document_id:
+                    return jsonify({'error': 'This document is already added'}), 409
+            
+            # Add new interview source
+            new_source = {
+                'title': title,
+                'type': 'interview',
+                'document_id': document_id,
+                'added_at': datetime.now().isoformat()
+            }
+        else:
+            return jsonify({'error': 'Invalid data type. Must be "survey" or "interview"'}), 400
         
-        # Add new source
-        new_source = {
-            'title': title,
-            'spreadsheet_id': spreadsheet_id,
-            'gid': gid,
-            'added_at': datetime.now().isoformat()
-        }
         sources.append(new_source)
         
         # Save updated sources
@@ -1463,15 +1974,37 @@ def update_data_source():
     """Update a data source title"""
     try:
         data = request.json
+        print(f"\n=== UPDATE DATA SOURCE REQUEST ===")
+        print(f"Raw request data: {data}")
+        
         gid = data.get('gid', '')
+        document_id = data.get('document_id', '')
         spreadsheet_id = data.get('spreadsheet_id', '')
         new_title = data.get('title', '')
+        data_type = data.get('type', 'survey')
         
-        if not gid or not new_title:
-            return jsonify({'error': 'Missing required fields: gid or title'}), 400
+        print(f"Parsed values:")
+        print(f"  - type: {data_type}")
+        print(f"  - title: {new_title}")
+        print(f"  - gid: {gid}")
+        print(f"  - document_id: {document_id}")
+        print(f"  - spreadsheet_id: {spreadsheet_id}")
+        print(f"=================================\n")
+        
+        if not new_title:
+            return jsonify({'error': 'Missing required field: title'}), 400
+        
+        # Check based on data type
+        if data_type == 'interview' and not document_id:
+            print(f"ERROR: Interview type but no document_id provided")
+            return jsonify({'error': 'Missing required field for interview data: document_id'}), 400
+        elif data_type == 'survey' and not gid:
+            print(f"ERROR: Survey type but no gid provided")
+            return jsonify({'error': 'Missing required field for survey data: gid'}), 400
         
         # Check if it's a default sheet (from main spreadsheet)
-        if spreadsheet_id == SPREADSHEET_ID:
+        # Only check for default sheets if it's a survey type with matching spreadsheet_id
+        if data_type == 'survey' and spreadsheet_id == SPREADSHEET_ID:
             # For default sheets, we'll store custom titles separately
             custom_titles_file = os.path.join(os.path.dirname(__file__), 'custom_sheet_titles.json')
             custom_titles = {}
@@ -1501,26 +2034,35 @@ def update_data_source():
             # Find and update the source
             updated = False
             for i, source in enumerate(sources):
-                if source['gid'] == gid and source['spreadsheet_id'] == spreadsheet_id:
-                    # Update title
-                    source['title'] = new_title
-                    
-                    # If the request includes new spreadsheet_id or gid, this means URL was changed
-                    new_spreadsheet_id = data.get('new_spreadsheet_id')
-                    new_gid = data.get('new_gid')
-                    
-                    if new_spreadsheet_id and new_gid:
-                        # Check if the new GID already exists
-                        for other_source in sources:
-                            if other_source['gid'] == new_gid and other_source['spreadsheet_id'] == new_spreadsheet_id and other_source != source:
-                                return jsonify({'error': 'A data source with this spreadsheet ID and GID already exists'}), 409
+                # Check based on type
+                if data_type == 'interview':
+                    # For interview sources, match by document_id
+                    if source.get('type') == 'interview' and source.get('document_id') == document_id:
+                        source['title'] = new_title
+                        updated = True
+                        break
+                else:
+                    # For survey sources, match by gid and spreadsheet_id
+                    if source.get('gid') == gid and source.get('spreadsheet_id') == spreadsheet_id:
+                        # Update title
+                        source['title'] = new_title
                         
-                        # Update the spreadsheet_id and gid
-                        source['spreadsheet_id'] = new_spreadsheet_id
-                        source['gid'] = new_gid
-                    
-                    updated = True
-                    break
+                        # If the request includes new spreadsheet_id or gid, this means URL was changed
+                        new_spreadsheet_id = data.get('new_spreadsheet_id')
+                        new_gid = data.get('new_gid')
+                        
+                        if new_spreadsheet_id and new_gid:
+                            # Check if the new GID already exists
+                            for other_source in sources:
+                                if other_source.get('gid') == new_gid and other_source.get('spreadsheet_id') == new_spreadsheet_id and other_source != source:
+                                    return jsonify({'error': 'A data source with this spreadsheet ID and GID already exists'}), 409
+                            
+                            # Update the spreadsheet_id and gid
+                            source['spreadsheet_id'] = new_spreadsheet_id
+                            source['gid'] = new_gid
+                        
+                        updated = True
+                        break
             
             if updated:
                 save_data_sources(sources)
@@ -1563,6 +2105,7 @@ def get_data_sources():
             all_sources.append({
                 'title': custom_titles.get(sheet['gid'], sheet['name']),  # Use custom title if available
                 'original_title': sheet['name'],  # Keep original title for reference
+                'type': 'survey',  # Default sheets are always survey type
                 'spreadsheet_id': SPREADSHEET_ID,
                 'gid': sheet['gid'],
                 'is_default': True
@@ -1571,15 +2114,23 @@ def get_data_sources():
         # Add custom sources
         for source in custom_sources:
             # Check if there's a custom title for this source too
-            title = custom_titles.get(source['gid'], source['title'])
-            all_sources.append({
+            title = custom_titles.get(source['gid'], source['title']) if source.get('gid') else source['title']
+            source_data = {
                 'title': title,
                 'original_title': source['title'],  # Keep original for reference
-                'spreadsheet_id': source['spreadsheet_id'],
-                'gid': source['gid'],
+                'type': source.get('type', 'survey'),  # Default to survey for backward compatibility
                 'is_default': False,
                 'added_at': source.get('added_at')
-            })
+            }
+            
+            # Add fields based on type
+            if source.get('type') == 'interview':
+                source_data['document_id'] = source.get('document_id')
+            else:
+                source_data['spreadsheet_id'] = source.get('spreadsheet_id')
+                source_data['gid'] = source.get('gid')
+            
+            all_sources.append(source_data)
         
         return jsonify_unicode({
             'sources': all_sources,
