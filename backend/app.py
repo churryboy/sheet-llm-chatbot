@@ -357,18 +357,49 @@ def get_google_docs_content(document_id):
         # This works for documents that are publicly accessible
         export_url = f"https://docs.google.com/document/d/{document_id}/export?format=txt"
         
+        # Add headers to mimic a browser request
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
+        }
+        
         print(f"Attempting to fetch document via direct HTTP: {document_id}")
-        response = requests.get(export_url, allow_redirects=True)
+        print(f"URL: {export_url}")
+        
+        # Don't follow redirects automatically to see what's happening
+        response = requests.get(export_url, headers=headers, allow_redirects=False)
+        print(f"Initial response status: {response.status_code}")
+        
+        # If we get a redirect, it might be to a login page
+        if response.status_code in [301, 302, 303, 307, 308]:
+            redirect_url = response.headers.get('Location', '')
+            print(f"Got redirect to: {redirect_url}")
+            
+            # If redirect is to accounts.google.com, the document is not publicly accessible
+            if 'accounts.google.com' in redirect_url:
+                print(f"Document {document_id} requires authentication (redirect to login)")
+            else:
+                # Follow the redirect
+                response = requests.get(redirect_url, headers=headers, allow_redirects=True)
+                print(f"After following redirect, status: {response.status_code}")
         
         if response.status_code == 200:
-            # Successfully fetched the document
+            # Check if we actually got the document content or a login page
             content = response.text
-            print(f"Successfully fetched document content: {len(content)} characters")
-            return content.strip()
+            if '<!DOCTYPE html' in content[:100] or '<html' in content[:100]:
+                print(f"Received HTML instead of document content, likely a login page")
+                print(f"First 200 chars: {content[:200]}")
+            else:
+                print(f"Successfully fetched document content: {len(content)} characters")
+                return content.strip()
         elif response.status_code == 403:
-            print(f"Access denied to document {document_id}. Trying API method...")
+            print(f"Access denied (403) to document {document_id}")
         else:
-            print(f"HTTP {response.status_code} when fetching document. Trying API method...")
+            print(f"HTTP {response.status_code} when fetching document")
         
         # If direct HTTP failed, try using service account credentials
         if os.path.exists('credentials.json'):
